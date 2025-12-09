@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Flood Risk Predictor</title> 
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@3/tsparticles.bundle.min.js"></script>
+  <style>
+/* CSS Variables */
+:root {
+  --bg-primary: #05060a;
+  --bg-secondary: #0b0e18;
+  --text-primary: #e6eef8;
+  --text-muted: #9aa3b2;
+  --color-neon: #7cf0ff;
+  --color-accent: #7c7cff;
+  --color-green: #33d69f;
+  --color-yellow: #ffd166;
+  --color-blue: #5aa0ff;
+  --border-radius-sm: 8px;
+  --border-radius-md: 12px;
+  --border-radius-lg: 14px;
+  --transition-base: 0.25s ease;
+}
+
+/* Reset & Base */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #tsparticles {
+  height: 100%;
+}
+
+body {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: linear-gradient(180deg, #03040a 0%, #081022 60%);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* Particles Background */
+#tsparticles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Container */
+.container {
+  position: relative;
+  z-index: 2;
+  width: min(1100px, 95%);
+  margin: 40px auto;
+  padding: 0 1rem;
+}
+
+/* Header */
+header {
+  text-align: left;
+  margin-bottom: 24px;
+}
+
+header h1 {
+  font-size: clamp(1.5rem, 4vw, 1.75rem);
+  margin-bottom: 8px;
+  letter-spacing: 0.6px;
+  color: var(--color-neon);
+  font-weight: 700;
+}
+
+.sub {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* Main Layout */
+main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+/* Card Component */
+.card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius: var(--border-radius-lg);
+  padding: 20px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  border: 1px solid rgba(124,124,255,0.06);
+  backdrop-filter: blur(10px);
+}
+
+.upload-card {
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.map-card {
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-card h3 {
+  font-size: 1.125rem;
+  margin-bottom: 12px;
+  color: var(--color-neon);
+}
+
+/* Dropzone */
+.dropzone {
+  height: 280px;
+  border-radius: var(--border-radius-md);
+  border: 2px dashed rgba(124,124,255,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-base);
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0));
+  cursor: pointer;
+}
+
+.dropzone:hover,
+.dropzone.hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 40px rgba(124,124,255,0.08);
+  border-color: rgba(124,124,255,0.28);
+}
+
+.instructions {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 20px;
+  pointer-events: none;
+}
+
+.upload-ico {
+  width: 60px;
+  height: 60px;
+  color: var(--color-neon);
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+
+.instructions p {
+  margin-top: 12px;
+  font-size: 0.875rem;
+}
+
+.browse {
+  color: var(--color-neon);
+  cursor: pointer;
+  text-decoration: underline;
+  font-weight: 600;
+  pointer-events: all;
+}
+
+/* Result Panel */
+.result-panel {
+  display: none;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border-radius: var(--border-radius-md);
+  background: linear-gradient(90deg, rgba(255,255,255,0.01), rgba(124,124,255,0.02));
+  border: 1px solid rgba(124,124,255,0.08);
+}
+
+.result-panel.visible {
+  display: flex;
+}
+
+.preview-wrap {
+  flex-shrink: 0;
+  width: 140px;
+  height: 140px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.preview-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.result-info h2 {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+  color: var(--color-neon);
+  font-weight: 600;
+}
+
+/* Confidence Bar */
+.confidence {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.bar-bg {
+  flex: 1;
+  height: 14px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--color-green), var(--color-accent));
+  transition: width 0.6s ease;
+}
+
+.conf-text {
+  min-width: 56px;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Button */
+.btn {
+  background: linear-gradient(90deg, var(--color-neon), var(--color-accent));
+  color: #001;
+  padding: 10px 18px;
+  border-radius: var(--border-radius-sm);
+  border: none;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  box-shadow: 0 8px 30px rgba(124,124,255,0.12);
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(124,124,255,0.2);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Map */
+#map {
+  flex: 1;
+  min-height: 320px;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid rgba(255,255,255,0.03);
+  overflow: hidden;
+}
+
+.map-note {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+/* Footer */
+footer {
+  margin-top: 24px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* Loading State */
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    margin: 20px auto;
+  }
+  
+  main {
+    gap: 16px;
+  }
+  
+  .upload-card {
+    flex-direction: column;
+  }
+  
+  .result-panel {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .preview-wrap {
+    width: 100%;
+    max-width: 200px;
+  }
+}
+
+/* Accessibility */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Focus styles */
+button:focus-visible,
+.browse:focus-visible {
+  outline: 2px solid var(--color-neon);
+  outline-offset: 2px;
+}
+  </style>
+</head>
+<body>
+  <div id="tsparticles" aria-hidden="true"></div>
+
+  <div class="container">
+    <header>
+      <h1> Flood Risk and disaster-related heatmap Predictor</h1>
+      <p class="sub">Upload a satellite-like image or heatmap — the AI will predict risk and show it on the map.</p>
+    </header>
+
+    <main>
+      <section class="card upload-card" aria-label="Image Upload">
+        <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Upload image area">
+          <div class="instructions">
+            <svg class="upload-ico" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M5 20h14v-2H5v2M19 7h-4V3H9v4H5l7 7 7-7z"/>
+            </svg>
+            <p>Drag & drop image here, or <label for="fileInput" class="browse" tabindex="0">browse</label></p>
+            <input id="fileInput" type="file" accept="image/*" class="visually-hidden" aria-label="Choose file">
+          </div>
+        </div>
+
+        <div class="result-panel" id="resultPanel">
+          <div class="preview-wrap">
+            <img id="preview" src="" alt="Preview of uploaded image" />
+          </div>
+          <div class="result-info">
+            <h2 id="labelText">Ready to predict</h2>
+            <div class="confidence" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+              <div class="bar-bg">
+                <div id="confBar" class="bar-fill"></div>
+              </div>
+              <div id="confText" class="conf-text" aria-live="polite">--</div>
+            </div>
+            <button id="predictBtn" class="btn">Predict Risk</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card map-card" aria-label="Risk Map">
+        <h3>Interactive Risk Map</h3>
+        <div id="map" role="application" aria-label="Interactive map showing flood risk predictions"></div>
+        <p class="map-note">Predictions appear as colored markers (Green = Low, Yellow = Medium, Blue = High)</p>
+      </section>
+    </main>
+
+    <footer>Built for AI & Big Data • Demo Project</footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+// Configuration
+const CONFIG = {
+  riskColors: {
+    'Low Risk': { bar: 'linear-gradient(90deg, #33d69f, #6feac3)', marker: '#33d69f' },
+    'Medium Risk': { bar: 'linear-gradient(90deg, #ffd166, #ffbf70)', marker: '#ffd166' },
+    'High Risk': { bar: 'linear-gradient(90deg, #5aa0ff, #7fb7ff)', marker: '#5aa0ff' }
+  },
+  mapCenter: [37.5665, 126.9780],
+  mapZoom: 11,
+  markerRadius: 400
+};
+
+// State management
+const state = {
+  currentFile: null,
+  map: null
+};
+
+// Utility functions
+const debounce = (fn, delay) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+};
+
+// DOM elements
+const elements = {
+  drop: document.getElementById('dropzone'),
+  fileInput: document.getElementById('fileInput'),
+  preview: document.getElementById('preview'),
+  resultPanel: document.getElementById('resultPanel'),
+  labelText: document.getElementById('labelText'),
+  confBar: document.getElementById('confBar'),
+  confText: document.getElementById('confText'),
+  predictBtn: document.getElementById('predictBtn')
+};
+
+// Initialize particles
+function initParticles() {
+  tsParticles.load('tsparticles', {
+    fpsLimit: 60,
+    particles: {
+      number: { value: 70, density: { enable: true } },
+      color: { value: ['#7cf0ff', '#7c7cff'] },
+      shape: { type: 'circle' },
+      opacity: { value: 0.08 },
+      size: { value: { min: 1, max: 4 } },
+      move: {
+        enable: true,
+        speed: 0.6,
+        direction: 'none',
+        random: true,
+        straight: false,
+        outModes: { default: 'bounce' }
+      }
+    },
+    interactivity: { detectsOn: 'canvas' },
+    detectRetina: true
+  });
+}
+
+// Initialize map
+function initMap() {
+  state.map = L.map('map').setView(CONFIG.mapCenter, CONFIG.mapZoom);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(state.map);
+}
+
+// Handle file upload
+function handleFile(file) {
+  if (!file.type.startsWith('image/')) {
+    alert('Please upload an image file');
+    return;
+  }
+
+  state.currentFile = file;
+  const url = URL.createObjectURL(file);
+  
+  elements.preview.onload = () => URL.revokeObjectURL(url);
+  elements.preview.src = url;
+  
+  elements.resultPanel.classList.add('visible');
+  elements.labelText.textContent = 'Ready to predict';
+  resetConfidence();
+  elements.predictBtn.disabled = false;
+}
+
+// Reset confidence display
+function resetConfidence() {
+  elements.confBar.style.width = '0%';
+  elements.confText.textContent = '--';
+  elements.confBar.parentElement.parentElement.setAttribute('aria-valuenow', '0');
+}
+
+// Update confidence display
+function updateConfidence(confidence, label) {
+  const percent = Math.round(confidence * 100);
+  elements.confBar.style.width = `${percent}%`;
+  elements.confText.textContent = `${percent}%`;
+  elements.confBar.parentElement.parentElement.setAttribute('aria-valuenow', percent);
+  
+  const colors = CONFIG.riskColors[label];
+  if (colors) {
+    elements.confBar.style.background = colors.bar;
+  }
+}
+
+// Add marker to map
+function addMapMarker(label, confidence) {
+  const lat = CONFIG.mapCenter[0] + (Math.random() - 0.5) * 0.12;
+  const lng = CONFIG.mapCenter[1] + (Math.random() - 0.5) * 0.12;
+  const color = CONFIG.riskColors[label]?.marker || '#7c7cff';
+  
+  L.circle([lat, lng], {
+    radius: CONFIG.markerRadius,
+    color: color,
+    fillColor: color,
+    fillOpacity: 0.25,
+    weight: 2
+  })
+    .addTo(state.map)
+    .bindPopup(`<b>${label}</b><br>Confidence: ${Math.round(confidence * 100)}%`)
+    .openPopup();
+}
+
+// Handle prediction
+async function handlePredict() {
+  if (!state.currentFile) {
+    alert('Please choose an image first');
+    return;
+  }
+
+  elements.labelText.textContent = 'Analyzing...';
+  elements.predictBtn.disabled = true;
+  elements.predictBtn.classList.add('loading');
+
+  const formData = new FormData();
+  formData.append('image', state.currentFile);
+
+  try {
+    const response = await fetch('/predict', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    elements.labelText.textContent = data.label;
+    updateConfidence(data.confidence, data.label);
+    addMapMarker(data.label, data.confidence);
+
+  } catch (error) {
+    console.error('Prediction error:', error);
+    elements.labelText.textContent = 'Prediction failed';
+    alert(`Error: ${error.message}`);
+  } finally {
+    elements.predictBtn.disabled = false;
+    elements.predictBtn.classList.remove('loading');
+  }
+}
+
+// Setup drag and drop
+function setupDragDrop() {
+  ['dragenter', 'dragover'].forEach(evt => {
+    elements.drop.addEventListener(evt, (e) => {
+      e.preventDefault();
+      elements.drop.classList.add('hover');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(evt => {
+    elements.drop.addEventListener(evt, (e) => {
+      e.preventDefault();
+      elements.drop.classList.remove('hover');
+    });
+  });
+
+  elements.drop.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
+  });
+
+  // Keyboard accessibility for dropzone
+  elements.drop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      elements.fileInput.click();
+    }
+  });
+}
+
+// Setup file input
+function setupFileInput() {
+  elements.fileInput.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+  });
+
+  // Make browse label keyboard accessible
+  const browseLabel = document.querySelector('.browse');
+  browseLabel.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      elements.fileInput.click();
+    }
+  });
+}
+
+// Initialize app
+document.addEventListener('DOMContentLoaded', () => {
+  initParticles();
+  initMap();
+  setupDragDrop();
+  setupFileInput();
+  
+  elements.predictBtn.addEventListener('click', handlePredict);
+  
+  // Prevent default drag behavior on document
+  document.addEventListener('dragover', (e) => e.preventDefault());
+  document.addEventListener('drop', (e) => e.preventDefault());
+});
+  </script>
+</body>
+</html>
